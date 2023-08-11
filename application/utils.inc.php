@@ -2472,7 +2472,7 @@ SQL;
 						}
 					}
 					$sPathName = pathinfo($sPath, PATHINFO_FILENAME);
-					if (Utils::IsNotNullOrEmptyString($sPathName)) {
+					if (utils::IsNotNullOrEmptyString($sPathName)) {
 						$sFileName = $sPathName;
 					}
 					$sFileName .= $sExtension;
