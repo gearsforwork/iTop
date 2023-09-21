@@ -817,19 +817,21 @@ class UserRights
 		}
 	}
 
+	/**
+	 * @return string connected {@see User} login field value, otherwise empty string
+	 */
 	public static function GetUser()
 	{
-		if (is_null(self::$m_oUser))
-		{
+		if (is_null(self::$m_oUser)) {
 			return '';
 		}
-		else
-		{
-			return self::$m_oUser->Get('login');
-		}
+
+		return self::$m_oUser->Get('login');
 	}
 
-	/** User */
+	/**
+	 * @return User|null
+	 */
 	public static function GetUserObject()
 	{
 		if (is_null(self::$m_oUser))

@@ -169,7 +169,8 @@ class DBObjectTest extends ItopDataTestCase
 		} /** @noinspection PhpRedundantCatchClauseInspection */
 		catch (CoreCannotSaveObjectException $eCannotSave) {
 			$this->assertSame(Person::class, $eCannotSave->getObjectClass());
-			//FIXME issues $aExceptionIssues = $eCannotSave->getIssues();
+			$this->assertCount(1, $eCannotSave->getIssues());
+			$this->assertContains(Organization::class . '::' . $oMyCompanyOrg->GetKey(), $eCannotSave->getIssues()[0]);
 		} catch (Exception $e) {
 			$this->fail('When creating a Person object on a non allowed org, an error was thrown but not the expected one: ' . $e->getMessage());
 		}

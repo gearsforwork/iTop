@@ -814,15 +814,16 @@ class UserRightsProfile extends UserRightsAddOnAPI
 	}
 
 	/**
-	 * Find out which attribute is corresponding the the dimension 'owner org'
-	 * returns null if no such attribute has been found (no filtering should occur)
+	 * @param string $sClass
+	 * @return string|null Find out which attribute is corresponding the dimension 'owner org'
+	 *                  returns null if no such attribute has been found (no filtering should occur)
 	 */
 	public static function GetOwnerOrganizationAttCode($sClass)
 	{
 		$sAttCode = null;
 
 		$aCallSpec = array($sClass, 'MapContextParam');
-		if (($sClass == 'Organization') || is_subclass_of($sClass, 'Organization'))
+		if (($sClass === Organization::class) || is_subclass_of($sClass, Organization::class))
 		{
 			$sAttCode = 'id';
 		}

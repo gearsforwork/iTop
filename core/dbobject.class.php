@@ -2127,6 +2127,48 @@ abstract class DBObject implements iDisplay
 	}
 
 	/**
+	 * @return void
+	 *
+	 * @uses ListChanges
+	 * @uses UserRightsProfile::GetUserOrgs()
+	 * @uses m_aCheckIssues
+	 * @uses m_bSecurityIssue
+	 *
+	 * @since 2.7.10 3.0.4 3.1.1 3.2.0 N°6458 method creation
+	 */
+	final protected function DocCheckOrgId()
+	{
+		$oCurrentUser = UserRights::GetUserObject();
+		if (false === is_object($oCurrentUser)) {
+			// can happen for example in a phpunit where we didn't called login
+			return;
+		}
+
+		$oAddon = UserRights::GetModuleInstance();
+		if (false === method_exists($oAddon, 'GetUserOrgs')) {
+			return;
+		}
+		if (false === method_exists($oAddon, 'GetOwnerOrganizationAttCode')) {
+			return;
+		}
+
+		$sOrgAttCode = $oAddon::GetOwnerOrganizationAttCode(get_class($this));
+		foreach ($this->ListChanges() as $sAttCode => $CurrentValue) {
+			if ($sAttCode !== $sOrgAttCode) {
+				continue;
+			}
+
+			/** @var Organization $oOrgIdSet */
+			$sOrgIdSet = $CurrentValue;
+			$aCurrentUserAllowedOrgIds = $oAddon->GetUserOrgs($oCurrentUser, get_class($this));
+			if (false === in_array($sOrgIdSet, $aCurrentUserAllowedOrgIds, false)) {
+				$this->m_bSecurityIssue = true;
+				$this->m_aCheckIssues[] = 'Non allowed Organization::' . $sOrgIdSet;
+			}
+		}
+	}
+
+	/**
 	 * Check integrity rules (before inserting or updating the object)
 	 *
      * **This method is not meant to be called directly, use DBObject::CheckToWrite()!**
@@ -2224,6 +2266,9 @@ abstract class DBObject implements iDisplay
 			$this->m_aCheckIssues = array();
 
 			$oKPI = new ExecutionKPI();
+
+			$this->DocCheckOrgId();
+
 			$this->DoCheckToWrite();
             $oKPI->ComputeStatsForExtension($this, 'DoCheckToWrite');
 			if (count($this->m_aCheckIssues) == 0)
@@ -2383,11 +2428,11 @@ abstract class DBObject implements iDisplay
 	 * @api
 	 * @api-advanced
 	 *
-	 * @see  \DBObject::ListPreviousValuesForUpdatedAttributes() to get previous values anywhere in the CRUD stack
-	 * @see https://www.itophub.io/wiki/page?id=latest%3Acustomization%3Asequence_crud iTop CRUD stack documentation
-	 * @return array attname => currentvalue List the attributes that have been changed using {@see DBObject::Set()}.
+	 * @return array attcode => currentvalue List the attributes that have been changed using {@see DBObject::Set()}.
 	 *         Reset during {@see DBObject::DBUpdate()}
 	 * @throws Exception
+	 * @see  \DBObject::ListPreviousValuesForUpdatedAttributes() to get previous values anywhere in the CRUD stack
+	 * @see https://www.itophub.io/wiki/page?id=latest%3Acustomization%3Asequence_crud iTop CRUD stack documentation
 	 * @uses m_aCurrValues
      */
 	public function ListChanges()
