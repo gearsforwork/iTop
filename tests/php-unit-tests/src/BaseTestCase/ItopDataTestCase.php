@@ -15,7 +15,6 @@ namespace Combodo\iTop\Test\UnitTest;
 
 use ArchivedObjectException;
 use CMDBSource;
-use Config;
 use Contact;
 use DBObject;
 use DBObjectSet;
@@ -30,7 +29,6 @@ use lnkFunctionalCIToTicket;
 use MetaModel;
 use Person;
 use Server;
-use SetupUtils;
 use TagSetFieldData;
 use Ticket;
 use URP_UserProfile;
@@ -469,6 +467,35 @@ abstract class ItopDataTestCase extends ItopTestCase
 		$oSet = DBObjectSet::FromObject($oUserProfile);
 		$oUser = $this->createObject('UserLocal', array(
 			'contactid' => $iContactid,
+			'login' => $sLogin,
+			'password' => $sPassword,
+			'language' => 'EN US',
+			'profile_list' => $oSet,
+		));
+		$this->debug("Created {$oUser->GetName()} ({$oUser->GetKey()})");
+
+		return $oUser;
+	}
+
+	/**
+	 * @param string $sLogin
+	 * @param int $iProfileId
+	 *
+	 * @return \UserLocal
+	 * @throws Exception
+	 */
+	protected function CreateContactlessUser($sLogin, $iProfileId, $sPassword = null)
+	{
+		if (empty($sPassword)) {
+			$sPassword = $sLogin;
+		}
+
+		$oUserProfile = new URP_UserProfile();
+		$oUserProfile->Set('profileid', $iProfileId);
+		$oUserProfile->Set('reason', 'UNIT Tests');
+		$oSet = DBObjectSet::FromObject($oUserProfile);
+		/** @var \UserLocal $oUser */
+		$oUser = $this->createObject('UserLocal', array(
 			'login' => $sLogin,
 			'password' => $sPassword,
 			'language' => 'EN US',

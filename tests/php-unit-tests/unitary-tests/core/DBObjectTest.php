@@ -27,8 +27,16 @@
 namespace Combodo\iTop\Test\UnitTest\Core;
 
 use Combodo\iTop\Test\UnitTest\ItopDataTestCase;
+use CoreCannotSaveObjectException;
 use DBObject;
+use Exception;
 use MetaModel;
+use Organization;
+use Person;
+use PHPUnit\Framework\AssertionFailedError;
+use UserRights;
+use const UR_ACTION_CREATE;
+use const UR_ALLOWED_YES;
 
 
 /**
@@ -120,5 +128,50 @@ class DBObjectTest extends ItopDataTestCase
 		$this->markTestIncomplete('This test has not been implemented yet. wait for N°4967 fix');
 		$this->debug("ERROR: N°4967 - 'Previous Values For Updated Attributes' not updated if DBUpdate is called without modifying the object");
 		//$this->assertCount(0, $oOrg->ListPreviousValuesForUpdatedAttributes());
+	}
+
+
+	public function testInsertObjectWithOutOfSiloExtKey(): void
+	{
+		$oDemoOrgUser = $this->CreateContactlessUser('demo', 3);
+
+		/** @var Organization $oDemoOrg */
+		$oDemoOrg = MetaModel::GetObjectByName(Organization::class, 'Demo');
+		/** @var Organization $oMyCompanyOrg */
+		$oMyCompanyOrg = MetaModel::GetObjectByName(Organization::class, 'My Company/Department');
+		/** @var \URP_UserOrg $oUserOrg */
+		$oUserOrg = \MetaModel::NewObject('URP_UserOrg', ['allowed_org_id' => $oDemoOrg->GetKey(),]);
+
+		$oAllowedOrgList = $oDemoOrgUser->Get('allowed_org_list');
+		$oAllowedOrgList->AddItem($oUserOrg);
+		$oDemoOrgUser->Set('allowed_org_list', $oAllowedOrgList);
+		$oDemoOrgUser->DBWrite();
+
+		UserRights::Login($oDemoOrgUser->Get('login'));
+
+		$this->assertSame(
+			UR_ALLOWED_YES,
+			UserRights::IsActionAllowed(Person::class, UR_ACTION_CREATE),
+			'Test requirement : the test user must be able to create a Person object'
+		);
+
+		$oPerson = $this->CreatePerson(1, $oDemoOrg->GetKey());
+		$this->assertTrue(true, 'we should be able to create a new Person with our same org !');
+		$this->assertIsObject($oPerson, 'we should be able to create a new Person with our same org !');
+
+		try {
+			/** @noinspection PhpUnusedLocalVariableInspection */
+			$oPerson = $this->CreatePerson(1, $oMyCompanyOrg->GetKey());
+			$this->fail('We tried to create a Person object on a non allowed org and it worked, but it should throw an error !');
+		} catch (AssertionFailedError $e) {
+			/** @noinspection PhpExceptionImmediatelyRethrownInspection */
+			throw $e; // handles the fail() call just above
+		} /** @noinspection PhpRedundantCatchClauseInspection */
+		catch (CoreCannotSaveObjectException $eCannotSave) {
+			$this->assertSame(Person::class, $eCannotSave->getObjectClass());
+			//FIXME issues $aExceptionIssues = $eCannotSave->getIssues();
+		} catch (Exception $e) {
+			$this->fail('When creating a Person object on a non allowed org, an error was thrown but not the expected one: ' . $e->getMessage());
+		}
 	}
 }

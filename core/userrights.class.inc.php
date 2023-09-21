@@ -1029,7 +1029,7 @@ class UserRights
 
 	/**
 	 * @param string $sClass
-	 * @param int $iActionCode
+	 * @param int $iActionCode see UR_ACTION_* constants
 	 * @param DBObjectSet $oInstanceSet
 	 * @param User $oUser
 	 * @return int (UR_ALLOWED_YES|UR_ALLOWED_NO|UR_ALLOWED_DEPENDS)
