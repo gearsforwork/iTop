@@ -155,13 +155,28 @@ class DBObjectTest extends ItopDataTestCase
 			'Test requirement : the test user must be able to create a Person object'
 		);
 
-		$oPerson = $this->CreatePerson(1, $oDemoOrg->GetKey());
+		$oPerson1 = $this->CreatePerson(1, $oDemoOrg->GetKey());
 		$this->assertTrue(true, 'we should be able to create a new Person with our same org !');
-		$this->assertIsObject($oPerson, 'we should be able to create a new Person with our same org !');
+		$this->assertIsObject($oPerson1, 'we should be able to create a new Person with our same org !');
+
+		$oPerson1->Set('org_id', $oMyCompanyOrg->GetKey());
+		try {
+			$oPerson1->DBWrite();
+		} catch (AssertionFailedError $e) {
+			/** @noinspection PhpExceptionImmediatelyRethrownInspection */
+			throw $e; // handles the fail() call just above
+		} /** @noinspection PhpRedundantCatchClauseInspection */
+		catch (CoreCannotSaveObjectException $eCannotSave) {
+			$this->assertSame(Person::class, $eCannotSave->getObjectClass());
+			$this->assertCount(1, $eCannotSave->getIssues());
+			$this->assertContains(Organization::class . '::' . $oMyCompanyOrg->GetKey(), $eCannotSave->getIssues()[0]);
+		} catch (Exception $e) {
+			$this->fail('When creating a Person object on a non allowed org, an error was thrown but not the expected one: ' . $e->getMessage());
+		}
 
 		try {
 			/** @noinspection PhpUnusedLocalVariableInspection */
-			$oPerson = $this->CreatePerson(1, $oMyCompanyOrg->GetKey());
+			$oPerson2 = $this->CreatePerson(1, $oMyCompanyOrg->GetKey());
 			$this->fail('We tried to create a Person object on a non allowed org and it worked, but it should throw an error !');
 		} catch (AssertionFailedError $e) {
 			/** @noinspection PhpExceptionImmediatelyRethrownInspection */
