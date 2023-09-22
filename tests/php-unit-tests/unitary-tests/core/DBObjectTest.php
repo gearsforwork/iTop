@@ -131,23 +131,25 @@ class DBObjectTest extends ItopDataTestCase
 	}
 
 
-	public function testInsertObjectWithOutOfSiloExtKey(): void
+	public function testInsertObjectWithOutOfSiloExtKeyWithDemoOrgUser(): void
 	{
-		$oDemoOrgUser = $this->CreateContactlessUser('demo', 3);
-
 		/** @var Organization $oDemoOrg */
 		$oDemoOrg = MetaModel::GetObjectByName(Organization::class, 'Demo');
+		/** @var Organization $oDemoOrg */
+		$oItDepartementOrg = MetaModel::GetObjectByName(Organization::class, 'IT Department');
 		/** @var Organization $oMyCompanyOrg */
 		$oMyCompanyOrg = MetaModel::GetObjectByName(Organization::class, 'My Company/Department');
+
+		$sConfigurationManagerProfileId = 3;
+		$oUserWithAllowedOrgs = $this->CreateContactlessUser('demo', $sConfigurationManagerProfileId);
 		/** @var \URP_UserOrg $oUserOrg */
 		$oUserOrg = \MetaModel::NewObject('URP_UserOrg', ['allowed_org_id' => $oDemoOrg->GetKey(),]);
-
-		$oAllowedOrgList = $oDemoOrgUser->Get('allowed_org_list');
+		$oAllowedOrgList = $oUserWithAllowedOrgs->Get('allowed_org_list');
 		$oAllowedOrgList->AddItem($oUserOrg);
-		$oDemoOrgUser->Set('allowed_org_list', $oAllowedOrgList);
-		$oDemoOrgUser->DBWrite();
+		$oUserWithAllowedOrgs->Set('allowed_org_list', $oAllowedOrgList);
+		$oUserWithAllowedOrgs->DBWrite();
 
-		UserRights::Login($oDemoOrgUser->Get('login'));
+		UserRights::Login($oUserWithAllowedOrgs->Get('login'));
 
 		$this->assertSame(
 			UR_ALLOWED_YES,
@@ -189,5 +191,53 @@ class DBObjectTest extends ItopDataTestCase
 		} catch (Exception $e) {
 			$this->fail('When creating a Person object on a non allowed org, an error was thrown but not the expected one: ' . $e->getMessage());
 		}
+	}
+
+	public function testInsertObjectWithOutOfSiloExtKeyWithAdminUser(): void
+	{
+		/** @var Organization $oDemoOrg */
+		$oDemoOrg = MetaModel::GetObjectByName(Organization::class, 'Demo');
+		/** @var Organization $oMyCompanyOrg */
+		$oMyCompanyOrg = MetaModel::GetObjectByName(Organization::class, 'My Company/Department');
+
+		UserRights::Login('admin');
+
+		$oPerson1 = $this->CreatePerson(1, $oDemoOrg->GetKey());
+		$this->assertTrue(true, 'we should be able to create a new Person in any org');
+		$this->assertIsObject($oPerson1, 'we should be able to create a new Person in any org');
+
+		$oPerson1->Set('org_id', $oMyCompanyOrg->GetKey());
+		$oPerson1->DBWrite();
+		$this->assertTrue(true, 'we should be able to update a Person in any org');
+
+		/** @noinspection PhpUnusedLocalVariableInspection */
+		$oPerson2 = $this->CreatePerson(1, $oMyCompanyOrg->GetKey());
+		$this->assertTrue(true, 'we should be able to create a new Person in any org');
+		$this->assertIsObject($oPerson1, 'we should be able to create a new Person in any org');
+	}
+
+	public function testInsertObjectWithOutOfSiloExtKeyWithOneOrgUser(): void
+	{
+		/** @var Organization $oDemoOrg */
+		$oDemoOrg = MetaModel::GetObjectByName(Organization::class, 'Demo');
+		/** @var Organization $oMyCompanyOrg */
+		$oMyCompanyOrg = MetaModel::GetObjectByName(Organization::class, 'My Company/Department');
+
+		$sConfigurationManagerProfileId = 3;
+		$oOneOrgUser = $this->CreateContactlessUser('demo', $sConfigurationManagerProfileId);
+		UserRights::Login($oOneOrgUser->Get('login'));
+
+		$oPerson1 = $this->CreatePerson(1, $oDemoOrg->GetKey());
+		$this->assertTrue(true, 'we should be able to create a new Person in any org');
+		$this->assertIsObject($oPerson1, 'we should be able to create a new Person in any org');
+
+		$oPerson1->Set('org_id', $oMyCompanyOrg->GetKey());
+		$oPerson1->DBWrite();
+		$this->assertTrue(true, 'we should be able to update a Person in any org');
+
+		/** @noinspection PhpUnusedLocalVariableInspection */
+		$oPerson2 = $this->CreatePerson(1, $oMyCompanyOrg->GetKey());
+		$this->assertTrue(true, 'we should be able to create a new Person in any org');
+		$this->assertIsObject($oPerson1, 'we should be able to create a new Person in any org');
 	}
 }

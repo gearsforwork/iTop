@@ -2135,12 +2135,17 @@ abstract class DBObject implements iDisplay
 	 * @uses m_bSecurityIssue
 	 *
 	 * @since 2.7.10 3.0.4 3.1.1 3.2.0 N°6458 method creation
+	 *
+	 * @link https://www.itophub.io/wiki/page?id=latest:admin:managing_user_accounts#restricting_access_to_a_set_of_organizations Reference on User allowed org field
 	 */
 	final protected function DocCheckOrgId()
 	{
 		$oCurrentUser = UserRights::GetUserObject();
 		if (false === is_object($oCurrentUser)) {
 			// can happen for example in a phpunit where we didn't called login
+			return;
+		}
+		if (UserRights::IsAdministrator()) {
 			return;
 		}
 
@@ -2153,6 +2158,12 @@ abstract class DBObject implements iDisplay
 		}
 
 		$sOrgAttCode = $oAddon::GetOwnerOrganizationAttCode(get_class($this));
+		$aCurrentUserAllowedOrgIds = $oAddon->GetUserOrgs($oCurrentUser, get_class($this));
+		if (count($aCurrentUserAllowedOrgIds) === 0) {
+			// no allowed org == access to all orgs !
+			return;
+		}
+
 		foreach ($this->ListChanges() as $sAttCode => $CurrentValue) {
 			if ($sAttCode !== $sOrgAttCode) {
 				continue;
@@ -2160,7 +2171,6 @@ abstract class DBObject implements iDisplay
 
 			/** @var Organization $oOrgIdSet */
 			$sOrgIdSet = $CurrentValue;
-			$aCurrentUserAllowedOrgIds = $oAddon->GetUserOrgs($oCurrentUser, get_class($this));
 			if (false === in_array($sOrgIdSet, $aCurrentUserAllowedOrgIds, false)) {
 				$this->m_bSecurityIssue = true;
 				$this->m_aCheckIssues[] = 'Non allowed Organization::' . $sOrgIdSet;
