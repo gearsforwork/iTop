@@ -216,7 +216,7 @@ class DBObjectTest extends ItopDataTestCase
 		$this->assertIsObject($oPerson1, 'we should be able to create a new Person in any org');
 	}
 
-	public function testInsertObjectWithOutOfSiloExtKeyWithOneOrgUser(): void
+	public function testInsertObjectWithOutOfSiloExtKeyWithEmptyAllowedOrgsUser(): void
 	{
 		/** @var Organization $oDemoOrg */
 		$oDemoOrg = MetaModel::GetObjectByName(Organization::class, 'Demo');
