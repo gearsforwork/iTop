@@ -263,9 +263,12 @@ class ModuleDiscovery
 				$aModule = $aModules[$sId];
 				foreach($aDeps as $sIndex => $sDepId)
 				{
-					if (!self::DependencyIsResolved($sDepId, $aOrderedModules, $aSelectedModules))
+					if (self::DependencyIsResolved($sDepId, $aOrderedModules, $aSelectedModules))
 					{
-						$aDeps[$sIndex] = $sDepId . ' (unmet)';
+						$aDeps[$sIndex] = '✅ ' . $sDepId;
+					} else
+					{
+						$aDeps[$sIndex] = '❌ ' .  $sDepId;
 					}
 				}
 				$aModuleDeps[] = "{$aModule['label']} (id: $sId) depends on: ".implode(' + ', $aDeps);
