@@ -43,6 +43,7 @@ use Exception;
 use InlineImage;
 use IssueLog;
 use MetaModel;
+use OutOfSiloAttributeValueException;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\HttpException;
@@ -1144,12 +1145,11 @@ class ObjectFormManager extends FormManager
 			// Writing object to DB
 			try
 			{
+				$this->oObject->CheckExtKeysSilo();
 				$this->oObject->DBWrite();
-			}
-			catch (CoreCannotSaveObjectException $e) {
+			} catch (CoreCannotSaveObjectException|OutOfSiloAttributeValueException $e) {
 				throw new Exception($e->getHtmlMessage());
-			}
-			catch (Exception $e) {
+			} catch (Exception $e) {
 				if ($bIsNew) {
 					throw new Exception(Dict::S('Portal:Error:ObjectCannotBeCreated'));
 				}

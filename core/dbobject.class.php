@@ -2239,6 +2239,67 @@ abstract class DBObject implements iDisplay
 	}
 
 	/**
+	 * @return void
+	 *
+	 * @throws CoreException if cannot get object attdef list
+	 * @throws SecurityException on attribute pointing to an out of silo object
+	 *
+	 * @link https://github.com/Combodo/iTop/security/advisories/GHSA-245j-66p9-pwmh
+	 * @since 2.7.10 3.0.4 3.1.1 3.2.0 N°6458
+	 */
+	final public function CheckExtKeysSilo()
+	{
+		$oCurrentUser = UserRights::GetUserObject();
+		if (is_null($oCurrentUser) || (false === is_object($oCurrentUser))) {
+			// can happen for example in a phpunit where we didn't called login
+			return;
+		}
+		if (UserRights::IsAdministrator()) {
+			return;
+		}
+
+		$aCurrentInstanceAttDefList = MetaModel::ListAttributeDefs(get_class($this));
+		foreach ($aCurrentInstanceAttDefList as $oAttDef) {
+			$sRemoteObjectClass = null;
+			$sRemoteObjectKey = null;
+
+			if ($oAttDef instanceof AttributeLinkedSetIndirect) {
+				/** @var ormLinkSet $oOrmSet */
+				$oOrmSet = $this->Get($oAttDef->GetCode());
+				while ($oLnk = $oOrmSet->Fetch()) {
+					$oLnk->CheckExtKeysSilo();
+				}
+				continue;
+			}
+
+			/** @noinspection PhpConditionCheckedByNextConditionInspection */
+			/** @noinspection NotOptimalIfConditionsInspection */
+			if (($oAttDef instanceof AttributeHierarchicalKey) || ($oAttDef instanceof AttributeExternalKey)) {
+				$sRemoteObjectClass = $oAttDef->GetTargetClass();
+				$sRemoteObjectKey = $this->Get($oAttDef->GetCode());
+			} else if ($oAttDef instanceof AttributeObjectKey) {
+				$sRemoteObjectClassAttCode = $oAttDef->Get('class_attcode');
+				$sRemoteObjectClass = $this->Get($sRemoteObjectClassAttCode);
+				$sRemoteObjectKey = $this->Get($oAttDef->GetCode());
+			} else {
+				continue;
+			}
+
+			if (utils::IsNullOrEmptyString($sRemoteObjectClass)
+				|| utils::IsNullOrEmptyString($sRemoteObjectKey)
+				|| ($sRemoteObjectKey === 0)
+			) {
+				continue;
+			}
+
+			$oRemoteObject = MetaModel::GetObject($sRemoteObjectClass, $sRemoteObjectKey, false);
+			if (is_null($oRemoteObject)) {
+				throw new OutOfSiloAttributeValueException($this, $oAttDef->GetCode());
+			}
+		}
+	}
+
+	/**
 	 * Check if it is allowed to delete the existing object from the database
 	 *
 	 * an array of displayable error is added in {@see DBObject::$m_aDeleteIssues}
@@ -2383,13 +2444,13 @@ abstract class DBObject implements iDisplay
 	 * @api
 	 * @api-advanced
 	 *
-	 * @see  \DBObject::ListPreviousValuesForUpdatedAttributes() to get previous values anywhere in the CRUD stack
-	 * @see https://www.itophub.io/wiki/page?id=latest%3Acustomization%3Asequence_crud iTop CRUD stack documentation
-	 * @return array attname => currentvalue List the attributes that have been changed using {@see DBObject::Set()}.
+	 * @return array attcode => currentvalue List the attributes that have been changed using {@see DBObject::Set()}.
 	 *         Reset during {@see DBObject::DBUpdate()}
 	 * @throws Exception
+	 * @see  \DBObject::ListPreviousValuesForUpdatedAttributes() to get previous values anywhere in the CRUD stack
+	 * @see https://www.itophub.io/wiki/page?id=latest%3Acustomization%3Asequence_crud iTop CRUD stack documentation
 	 * @uses m_aCurrValues
-     */
+	 */
 	public function ListChanges()
 	{
 		if ($this->m_bIsInDB)
@@ -2680,7 +2741,6 @@ abstract class DBObject implements iDisplay
 	 * @throws \Exception
 	 *
 	 * @internal
-	 *
 	 */
 	public function DBInsertNoReload()
 	{
@@ -2960,8 +3020,6 @@ abstract class DBObject implements iDisplay
 	 * Persist an object to the DB, for the first time
 	 *
      * @api
-     * @see DBWrite
-     *
 	 * @return int|null inserted object key
      *
 	 * @throws \ArchivedObjectException
@@ -2971,10 +3029,12 @@ abstract class DBObject implements iDisplay
 	 * @throws \CoreWarning
 	 * @throws \MySQLException
 	 * @throws \OQLException
+	 *
+	 * @see DBWrite
 	 */
 	public function DBInsert()
 	{
-	    $this->DBInsertNoReload();
+		$this->DBInsertNoReload();
 
         if (MetaModel::DBIsReadOnly())
         {
@@ -3073,13 +3133,13 @@ abstract class DBObject implements iDisplay
 	 * Update an object in DB
 	 *
 	 * @api
-	 * @see DBObject::DBWrite()
-	 *
 	 * @return int object key
 	 *
 	 * @throws \CoreException
 	 * @throws \CoreCannotSaveObjectException if CheckToWrite() returns issues
 	 * @throws \Exception
+	 *
+	 * @see DBObject::DBWrite()
 	 */
 	public function DBUpdate()
 	{
@@ -3087,6 +3147,7 @@ abstract class DBObject implements iDisplay
 		{
 			throw new CoreException("DBUpdate: could not update a newly created object, please call DBInsert instead");
 		}
+
 		// Protect against reentrance (e.g. cascading the update of ticket logs)
 		static $aUpdateReentrance = array();
 		$sKey = get_class($this).'::'.$this->GetKey();
@@ -3418,13 +3479,18 @@ abstract class DBObject implements iDisplay
 
 	/**
 	 * Make the current changes persistent - clever wrapper for Insert or Update
-     *
-     * @api
+	 *
+	 * @api
 	 *
 	 * @return int
-     *
-	 * @throws \CoreCannotSaveObjectException
-	 * @throws \CoreException
+	 *
+	 * @throws ArchivedObjectException
+	 * @throws CoreCannotSaveObjectException
+	 * @throws CoreException
+	 * @throws CoreUnexpectedValue
+	 * @throws CoreWarning
+	 * @throws MySQLException
+	 * @throws OQLException
 	 */
 	public function DBWrite()
 	{
