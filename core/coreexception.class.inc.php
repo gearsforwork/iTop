@@ -229,14 +229,10 @@ class CoreUnexpectedValue extends CoreException
 {
 }
 
-class SecurityException extends CoreException
-{
-}
-
 /**
  * @since 2.7.10 3.0.4 3.1.1 3.2.0 N°6458 object creation
  */
-class OutOfSiloAttributeValueException extends SecurityException
+class InvalidExternalKeyValueException extends CoreUnexpectedValue
 {
 	private const ENUM_PARAMS_OBJECT = 'current_object';
 	private const ENUM_PARAMS_ATTCODE = 'attcode';
@@ -254,7 +250,7 @@ class OutOfSiloAttributeValueException extends SecurityException
 			$aContextData[self::ENUM_PARAMS_USER] = get_class($oCurrentUser) . '::' . $oCurrentUser->GetKey();
 		}
 
-		parent::__construct('Attribute pointing to an unreachable object considering current user silo', $aContextData, '', $oPrevious);
+		parent::__construct('Attribute pointing to an object that is either non existing or not readable by the current user', $aContextData, '', $oPrevious);
 	}
 
 	public function GetAttCode(): string
@@ -266,6 +262,10 @@ class OutOfSiloAttributeValueException extends SecurityException
 	{
 		return $this->getContextData()[self::ENUM_PARAMS_ATTVALUE];
 	}
+}
+
+class SecurityException extends CoreException
+{
 }
 
 /**

@@ -1002,7 +1002,7 @@ HTML
 						{
 							throw new CoreCannotSaveObjectException(array('id' => $oObj->GetKey(), 'class' => $sClass, 'issues' => $aErrors));
 						}
-						$oObj->CheckExtKeysSilo();
+						$oObj->CheckChangedExtKeysValues();
 						// Transactions are now handled in DBUpdate
 						$oObj->DBUpdate();
 						$sMessage = Dict::Format('UI:Class_Object_Updated', MetaModel::GetName(get_class($oObj)), $oObj->GetName());
@@ -1234,7 +1234,7 @@ HTML
 					throw new CoreCannotSaveObjectException(array('id' => $oObj->GetKey(), 'class' => $sClass, 'issues' => $aErrors));
 				}
 
-				$oObj->CheckExtKeysSilo();
+				$oObj->CheckChangedExtKeysValues();
 				$oObj->DBInsertNoReload();// No need to reload
 
                 IssueLog::Trace('Object created', $sClass, array(

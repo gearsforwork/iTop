@@ -41,9 +41,9 @@ use DOMDocument;
 use DOMXPath;
 use Exception;
 use InlineImage;
+use InvalidExternalKeyValueException;
 use IssueLog;
 use MetaModel;
-use OutOfSiloAttributeValueException;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\HttpException;
@@ -1145,10 +1145,12 @@ class ObjectFormManager extends FormManager
 			// Writing object to DB
 			try
 			{
-				$this->oObject->CheckExtKeysSilo();
+				$this->oObject->CheckChangedExtKeysValues();
 				$this->oObject->DBWrite();
-			} catch (CoreCannotSaveObjectException|OutOfSiloAttributeValueException $e) {
+			} catch (CoreCannotSaveObjectException $e) {
 				throw new Exception($e->getHtmlMessage());
+			} catch (InvalidExternalKeyValueException $e) {
+				throw new Exception($e->getIssue());
 			} catch (Exception $e) {
 				if ($bIsNew) {
 					throw new Exception(Dict::S('Portal:Error:ObjectCannotBeCreated'));

@@ -1621,6 +1621,8 @@ class RestUtils
 	 *
 	 * @return DBObject The object found
 	 * @throws Exception If the input structure is not valid or it could not find exactly one object
+	 *
+	 * @see DBObject::CheckChangedExtKeysValues() generic method to do the check, but we need a specific one in this use case (values can be literal, OQL, friendlyname)
 	 */
 	public static function FindObjectFromKey($sClass, $key, $bAllowNullValue = false)
 	{

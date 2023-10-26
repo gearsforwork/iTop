@@ -22,18 +22,13 @@ namespace Combodo\iTop\Test\UnitTest\Core;
 use Attachment;
 use Combodo\iTop\Test\UnitTest\ItopDataTestCase;
 use DBObject;
-use Exception;
+use InvalidExternalKeyValueException;
 use MetaModel;
 use Organization;
-use OutOfSiloAttributeValueException;
 use Person;
-use PHPUnit\Framework\AssertionFailedError;
 use Server;
 use User;
-use UserRequest;
 use UserRights;
-use const UR_ACTION_CREATE;
-use const UR_ALLOWED_YES;
 
 
 /**
@@ -129,47 +124,54 @@ class DBObjectTest extends ItopDataTestCase
 
 	public function testCheckExtKeysSiloOnAttributeExternalKey()
 	{
+		// Preparing data...
 		/** @var Organization $oDemoOrg */
 		$oDemoOrg = MetaModel::GetObjectByName(Organization::class, 'Demo');
 		/** @var Organization $oMyCompanyOrg */
 		$oMyCompanyOrg = MetaModel::GetObjectByName(Organization::class, 'My Company/Department');
 
-		$sConfigurationManagerProfileId = 3;
+		$sConfigurationManagerProfileId = 3; // Access to Person objects
 		$oUserWithAllowedOrgs = $this->CreateDemoOrgUser($oDemoOrg, $sConfigurationManagerProfileId);
+
+		// We could use the CreatePerson, but no need to persist the new object !
+		/** @var Person $oPersonObject */
+		$oPersonObject = MetaModel::NewObject(Person::class, [
+			'name' => 'Person_Test_' . __CLASS__ . '_' . __METHOD__,
+			'first_name' => 'Test',
+			'org_id' => $oDemoOrg->GetKey(),
+		]);
+
+		// Setting an extkey and persisting so that this key won't be part of changes : its invalid value must NOT be tested
+		$oPersonOfMyCompanyOrg = MetaModel::GetObjectByName(Person::class, 'My first name My last name');
+		$oPersonObject->Set('manager_id', $oPersonOfMyCompanyOrg->GetKey());
+		$oPersonObject->DBWrite();
+
+		// Now we can do some tests !
 		UserRights::Login($oUserWithAllowedOrgs->Get('login'));
-
-		$this->assertSame(
-			UR_ALLOWED_YES,
-			UserRights::IsActionAllowed(Person::class, UR_ACTION_CREATE),
-			'Test requirement : the test user must be able to create a Person object'
-		);
-
-		$oPerson1 = $this->CreatePerson(1, $oDemoOrg->GetKey());
-		$oPerson1->CheckExtKeysSilo();
+		$oPersonObject->CheckChangedExtKeysValues();
 		$this->assertTrue(true, 'we should be able to create a new Person with our same org !');
-		$this->assertIsObject($oPerson1, 'we should be able to create a new Person with our same org !');
 
-		$oPerson1->Set('org_id', $oMyCompanyOrg->GetKey());
+		$oPersonObject->Set('org_id', $oMyCompanyOrg->GetKey());
 		try {
-			$oPerson1->CheckExtKeysSilo();
-		} catch (AssertionFailedError $e) {
-			/** @noinspection PhpExceptionImmediatelyRethrownInspection */
-			throw $e; // handles the fail() call just above
-		} /** @noinspection PhpRedundantCatchClauseInspection */
-		catch (OutOfSiloAttributeValueException $eCannotSave) {
+			$oPersonObject->CheckChangedExtKeysValues();
+			$this->fail('Creating a Person with an non allowed org should throw an exception !');
+		} catch (InvalidExternalKeyValueException $eCannotSave) {
 			$this->assertEquals('org_id', $eCannotSave->GetAttCode());
 			$this->assertEquals($oMyCompanyOrg->GetKey(), $eCannotSave->GetAttValue());
-		} catch (Exception $e) {
-			$this->fail('When creating a Person object on a non allowed org, an error was thrown but not the expected one: ' . $e->getMessage());
 		}
 
+		// ugly hack to remove caches SQL query :(
+		// In 3.0+ this won't be necessary anymore thanks to UserRights::Logoff
+		$this->SetNonPublicStaticProperty(MetaModel::class, 'aQueryCacheGetObject', []);
+
 		UserRights::Login('admin');
-		$oPerson1->CheckExtKeysSilo();
+		$oPersonObject->CheckChangedExtKeysValues();
 		$this->assertTrue(true, 'Admin user can create objects in any org');
 	}
 
 	public function testCheckExtKeysSiloOnAttributeLinkedSetIndirect()
 	{
+		// Preparing data...
 		/** @var Organization $oDemoOrg */
 		$oDemoOrg = MetaModel::GetObjectByName(Organization::class, 'Demo');
 		/** @var Organization $oItDepartmentOrg */
@@ -180,30 +182,26 @@ class DBObjectTest extends ItopDataTestCase
 			'org_id' => $oItDepartmentOrg->GetKey(),
 		]);
 
-		$sSupportAgentProfileId = 5;
+		$sSupportAgentProfileId = 5; // access to UserRequest objects
 		$oUserWithAllowedOrgs = $this->CreateDemoOrgUser($oDemoOrg, $sSupportAgentProfileId);
+
+
+		// Now we can do some tests !
 		UserRights::Login($oUserWithAllowedOrgs->Get('login'));
-
-		$this->assertSame(
-			UR_ALLOWED_YES,
-			UserRights::IsActionAllowed(UserRequest::class, UR_ACTION_CREATE),
-			'Test requirement : the test user must be able to create a UserRequest object'
-		);
-
 		$oTicketOnDemoOrg = $this->CreateUserRequest(0, ['org_id' => $oDemoOrg->GetKey()]);
 
 		/** @var Server $oServer1 */
 		$oServer1 = MetaModel::GetObjectByName(Server::class, 'Server1');
 		$this->AddCIToTicket($oServer1, $oTicketOnDemoOrg);
-		$oTicketOnDemoOrg->CheckExtKeysSilo();
+		$oTicketOnDemoOrg->CheckChangedExtKeysValues();
 		$this->assertTrue(true, 'Should be able to add an allowed org CI to a ticket');
 		$oTicketOnDemoOrg->DBWrite();
 
 		$this->AddCIToTicket($oServerOnItDepartmentOrg, $oTicketOnDemoOrg);
 		try {
-			$oTicketOnDemoOrg->CheckExtKeysSilo();
+			$oTicketOnDemoOrg->CheckChangedExtKeysValues();
 			$this->fail('There should be an error on ticket pointing to a non allowed org server');
-		} catch (OutOfSiloAttributeValueException $e) {
+		} catch (InvalidExternalKeyValueException $e) {
 			// we are getting the exception on the lnk class
 			// In consequence attcode is `lnkFunctionalCIToTicket.functionalci_id` instead of `Ticket.functionalcis_list`
 			$this->assertEquals('functionalci_id', $e->GetAttCode());
@@ -213,6 +211,7 @@ class DBObjectTest extends ItopDataTestCase
 
 	public function testCheckExtKeysSiloOnAttributeObjectKey()
 	{
+		// Preparing data...
 		/** @var Organization $oDemoOrg */
 		$oDemoOrg = MetaModel::GetObjectByName(Organization::class, 'Demo');
 		/** @var Organization $oMyCompanyOrg */
@@ -223,28 +222,26 @@ class DBObjectTest extends ItopDataTestCase
 
 		$sSupportAgentProfileId = 5;
 		$oUserWithAllowedOrgs = $this->CreateDemoOrgUser($oDemoOrg, $sSupportAgentProfileId);
-		UserRights::Login($oUserWithAllowedOrgs->Get('login'));
 
-		$this->assertSame(
-			UR_ALLOWED_YES,
-			UserRights::IsActionAllowed(Attachment::class, UR_ACTION_CREATE),
-			'Test requirement : the test user must be able to create an Attachment object'
-		);
+
+		// Now we can do some tests !
+		UserRights::Login($oUserWithAllowedOrgs->Get('login'));
 
 		$oAttachmentOnDemoOrgTicket = MetaModel::NewObject(Attachment::class, [
 			'item_class' => get_class($oTicketOnDemoOrg),
 			'item_id' => $oTicketOnDemoOrg->GetKey(),
 		]);
-		$oAttachmentOnDemoOrgTicket->CheckExtKeysSilo();
+		$oAttachmentOnDemoOrgTicket->CheckChangedExtKeysValues();
+		$this->assertTrue(true, 'Should be able to create an attachment pointing to a ticket in the allowed org list');
 
 		$oAttachmentOnMyCompanyOrgTicket = MetaModel::NewObject(Attachment::class, [
 			'item_class' => get_class($oTicketOnMyCompanyOrg),
 			'item_id' => $oTicketOnMyCompanyOrg->GetKey(),
 		]);
 		try {
-			$oAttachmentOnMyCompanyOrgTicket->CheckExtKeysSilo();
+			$oAttachmentOnMyCompanyOrgTicket->CheckChangedExtKeysValues();
 			$this->fail('There should be an error on attachment pointing to a non allowed org ticket');
-		} catch (OutOfSiloAttributeValueException $e) {
+		} catch (InvalidExternalKeyValueException $e) {
 			$this->assertEquals('item_id', $e->GetAttCode());
 			$this->assertEquals($oTicketOnMyCompanyOrg->GetKey(), $e->GetAttValue());
 		}
@@ -252,7 +249,7 @@ class DBObjectTest extends ItopDataTestCase
 
 	private function CreateDemoOrgUser(Organization $oDemoOrg, string $sProfileId): User
 	{
-		$oUserWithAllowedOrgs = $this->CreateContactlessUser('demo', $sProfileId);
+		$oUserWithAllowedOrgs = $this->CreateContactlessUser('demo_test_' . __CLASS__, $sProfileId);
 		/** @var \URP_UserOrg $oUserOrg */
 		$oUserOrg = \MetaModel::NewObject('URP_UserOrg', ['allowed_org_id' => $oDemoOrg->GetKey(),]);
 		$oAllowedOrgList = $oUserWithAllowedOrgs->Get('allowed_org_list');

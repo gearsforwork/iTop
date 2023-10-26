@@ -2239,35 +2239,33 @@ abstract class DBObject implements iDisplay
 	}
 
 	/**
+	 * Checks for extkeys values. This will throw exception on non-existing as well as non-accessible objects (silo, scopes).
+	 * That's why the test is done for all users including Administratos
+	 *
+	 * Note that due to perf issues, this isn't called directly by the ORM, but has to be called by consumers when possible.
+	 *
 	 * @return void
 	 *
 	 * @throws CoreException if cannot get object attdef list
-	 * @throws SecurityException on attribute pointing to an out of silo object
+	 * @throws SecurityException if one extkey is pointing to an invalid value
 	 *
 	 * @link https://github.com/Combodo/iTop/security/advisories/GHSA-245j-66p9-pwmh
 	 * @since 2.7.10 3.0.4 3.1.1 3.2.0 N°6458
+	 *
+	 * @see \RestUtils::FindObjectFromKey for the control in the REST endpoint
 	 */
-	final public function CheckExtKeysSilo()
+	final public function CheckChangedExtKeysValues() //TODO callable $oLoadObjectCallback
 	{
-		$oCurrentUser = UserRights::GetUserObject();
-		if (is_null($oCurrentUser) || (false === is_object($oCurrentUser))) {
-			// can happen for example in a phpunit where we didn't called login
-			return;
-		}
-		if (UserRights::IsAdministrator()) {
-			return;
-		}
-
-		$aCurrentInstanceAttDefList = MetaModel::ListAttributeDefs(get_class($this));
-		foreach ($aCurrentInstanceAttDefList as $oAttDef) {
-			$sRemoteObjectClass = null;
-			$sRemoteObjectKey = null;
+		$aChanges = $this->ListChanges();
+		$aAttCodesChanged = array_keys($aChanges);
+		foreach ($aAttCodesChanged as $sAttDefCode) {
+			$oAttDef = MetaModel::GetAttributeDef(get_class($this), $sAttDefCode);
 
 			if ($oAttDef instanceof AttributeLinkedSetIndirect) {
 				/** @var ormLinkSet $oOrmSet */
-				$oOrmSet = $this->Get($oAttDef->GetCode());
+				$oOrmSet = $this->Get($sAttDefCode);
 				while ($oLnk = $oOrmSet->Fetch()) {
-					$oLnk->CheckExtKeysSilo();
+					$oLnk->CheckChangedExtKeysValues();
 				}
 				continue;
 			}
@@ -2276,15 +2274,16 @@ abstract class DBObject implements iDisplay
 			/** @noinspection NotOptimalIfConditionsInspection */
 			if (($oAttDef instanceof AttributeHierarchicalKey) || ($oAttDef instanceof AttributeExternalKey)) {
 				$sRemoteObjectClass = $oAttDef->GetTargetClass();
-				$sRemoteObjectKey = $this->Get($oAttDef->GetCode());
+				$sRemoteObjectKey = $this->Get($sAttDefCode);
 			} else if ($oAttDef instanceof AttributeObjectKey) {
 				$sRemoteObjectClassAttCode = $oAttDef->Get('class_attcode');
 				$sRemoteObjectClass = $this->Get($sRemoteObjectClassAttCode);
-				$sRemoteObjectKey = $this->Get($oAttDef->GetCode());
+				$sRemoteObjectKey = $this->Get($sAttDefCode);
 			} else {
 				continue;
 			}
 
+			/** @noinspection NotOptimalIfConditionsInspection */
 			if (utils::IsNullOrEmptyString($sRemoteObjectClass)
 				|| utils::IsNullOrEmptyString($sRemoteObjectKey)
 				|| ($sRemoteObjectKey === 0)
@@ -2294,7 +2293,7 @@ abstract class DBObject implements iDisplay
 
 			$oRemoteObject = MetaModel::GetObject($sRemoteObjectClass, $sRemoteObjectKey, false);
 			if (is_null($oRemoteObject)) {
-				throw new OutOfSiloAttributeValueException($this, $oAttDef->GetCode());
+				throw new InvalidExternalKeyValueException($this, $sAttDefCode);
 			}
 		}
 	}
