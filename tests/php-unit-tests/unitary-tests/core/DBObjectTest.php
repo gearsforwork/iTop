@@ -145,6 +145,11 @@ class DBObjectTest extends ItopDataTestCase
 		$sConfigurationManagerProfileId = 3; // Access to Person objects
 		$oUserWithAllowedOrgs = $this->CreateDemoOrgUser($oDemoOrg, $sConfigurationManagerProfileId);
 
+		$oAdminUser = MetaModel::GetObjectByName(User::class, 'admin');
+		if (is_null($oAdminUser)) {
+			$oAdminUser = $this->CreateUser('admin', 1);
+		}
+
 		// We could use the CreatePerson, but no need to persist the new object !
 		/** @var Person $oPersonObject */
 		$oPersonObject = MetaModel::NewObject(Person::class, [
@@ -197,8 +202,7 @@ class DBObjectTest extends ItopDataTestCase
 		// In 3.0+ this won't be necessary anymore thanks to UserRights::Logoff
 		$this->SetNonPublicStaticProperty(MetaModel::class, 'aQueryCacheGetObject', []);
 
-		$bAdminLoginResult = UserRights::Login('admin');
-		$this->assertTrue($bAdminLoginResult, 'cannot log as admin user :(');
+		UserRights::Login($oAdminUser->Get('login'));
 		$oPersonObject->CheckChangedExtKeysValues();
 		$this->assertTrue(true, 'Admin user can create objects in any org');
 	}
