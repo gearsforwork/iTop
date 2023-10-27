@@ -31,6 +31,7 @@ use Combodo\iTop\Form\Field\LabelField;
 use Combodo\iTop\Form\Form;
 use Combodo\iTop\Form\FormManager;
 use Combodo\iTop\Portal\Helper\ApplicationHelper;
+use Combodo\iTop\Portal\Helper\SecurityHelper;
 use CoreCannotSaveObjectException;
 use DBObject;
 use DBObjectSearch;
@@ -49,6 +50,7 @@ use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 use UserRights;
 use utils;
+use const UR_ACTION_READ;
 
 /**
  * Description of ObjectFormManager
@@ -1145,7 +1147,11 @@ class ObjectFormManager extends FormManager
 			// Writing object to DB
 			try
 			{
-				$this->oObject->CheckChangedExtKeysValues();
+				$this->oObject->CheckChangedExtKeysValues(function ($sClass, $sId): bool {
+					/** @var SecurityHelper $oSecurityHelper */
+					$oSecurityHelper = $this->oContainer->get('security_helper');
+					return $oSecurityHelper->IsActionAllowed(UR_ACTION_READ, $sClass, $sId);
+				});
 				$this->oObject->DBWrite();
 			} catch (CoreCannotSaveObjectException $e) {
 				throw new Exception($e->getHtmlMessage());

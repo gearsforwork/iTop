@@ -2244,9 +2244,16 @@ abstract class DBObject implements iDisplay
 	 *
 	 * Note that due to perf issues, this isn't called directly by the ORM, but has to be called by consumers when possible.
 	 *
+	 * @param callable(string, string):bool|null $oIsObjectLoadableCallback Override to check if object is accessible.
+	 *                          Parameters are object class and key
+	 *                          Return value should be false if cannot access object, true otherwise
 	 * @return void
 	 *
+	 * @throws ArchivedObjectException
 	 * @throws CoreException if cannot get object attdef list
+	 * @throws CoreUnexpectedValue
+	 * @throws InvalidExternalKeyValueException
+	 * @throws MySQLException
 	 * @throws SecurityException if one extkey is pointing to an invalid value
 	 *
 	 * @link https://github.com/Combodo/iTop/security/advisories/GHSA-245j-66p9-pwmh
@@ -2254,8 +2261,18 @@ abstract class DBObject implements iDisplay
 	 *
 	 * @see \RestUtils::FindObjectFromKey for the control in the REST endpoint
 	 */
-	final public function CheckChangedExtKeysValues() //TODO callable $oLoadObjectCallback
+	final public function CheckChangedExtKeysValues(callable $oIsObjectLoadableCallback = null)
 	{
+		if (is_null($oIsObjectLoadableCallback)) {
+			$oIsObjectLoadableCallback = function ($sClass, $sId) {
+				$oRemoteObject = MetaModel::GetObject($sClass, $sId, false);
+				if (is_null($oRemoteObject)) {
+					return false;
+				}
+				return true;
+			};
+		}
+
 		$aChanges = $this->ListChanges();
 		$aAttCodesChanged = array_keys($aChanges);
 		foreach ($aAttCodesChanged as $sAttDefCode) {
@@ -2291,8 +2308,7 @@ abstract class DBObject implements iDisplay
 				continue;
 			}
 
-			$oRemoteObject = MetaModel::GetObject($sRemoteObjectClass, $sRemoteObjectKey, false);
-			if (is_null($oRemoteObject)) {
+			if (false === $oIsObjectLoadableCallback($sRemoteObjectClass, $sRemoteObjectKey)) {
 				throw new InvalidExternalKeyValueException($this, $sAttDefCode);
 			}
 		}

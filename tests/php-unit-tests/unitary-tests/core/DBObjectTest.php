@@ -122,13 +122,25 @@ class DBObjectTest extends ItopDataTestCase
 		//$this->assertCount(0, $oOrg->ListPreviousValuesForUpdatedAttributes());
 	}
 
-	public function testCheckExtKeysSiloOnAttributeExternalKey()
+	public function testCheckExtKeysSiloOnAttributeExternalKeyWithCallbacks()
 	{
 		// Preparing data...
+		$oAlwaysTrueCallback = function () {
+			return true;
+		};
+		$oAlwaysFalseCallback = function () {
+			return false;
+		};
+
 		/** @var Organization $oDemoOrg */
 		$oDemoOrg = MetaModel::GetObjectByName(Organization::class, 'Demo');
 		/** @var Organization $oMyCompanyOrg */
 		$oMyCompanyOrg = MetaModel::GetObjectByName(Organization::class, 'My Company/Department');
+
+		/** @var Person $oPersonOfDemoOrg */
+		$oPersonOfDemoOrg = MetaModel::GetObjectByName(Person::class, 'Agatha Christie');
+		/** @var Person $oPersonOfMyCompanyOrg */
+		$oPersonOfMyCompanyOrg = MetaModel::GetObjectByName(Person::class, 'My first name My last name');
 
 		$sConfigurationManagerProfileId = 3; // Access to Person objects
 		$oUserWithAllowedOrgs = $this->CreateDemoOrgUser($oDemoOrg, $sConfigurationManagerProfileId);
@@ -138,26 +150,47 @@ class DBObjectTest extends ItopDataTestCase
 		$oPersonObject = MetaModel::NewObject(Person::class, [
 			'name' => 'Person_Test_' . __CLASS__ . '_' . __METHOD__,
 			'first_name' => 'Test',
-			'org_id' => $oDemoOrg->GetKey(),
+			'org_id' => $oMyCompanyOrg->GetKey(),
 		]);
-
-		// Setting an extkey and persisting so that this key won't be part of changes : its invalid value must NOT be tested
-		$oPersonOfMyCompanyOrg = MetaModel::GetObjectByName(Person::class, 'My first name My last name');
-		$oPersonObject->Set('manager_id', $oPersonOfMyCompanyOrg->GetKey());
+		// Persisting so that extkeys won't be part of changes : their invalid values must NOT be tested
 		$oPersonObject->DBWrite();
 
 		// Now we can do some tests !
 		UserRights::Login($oUserWithAllowedOrgs->Get('login'));
 		$oPersonObject->CheckChangedExtKeysValues();
-		$this->assertTrue(true, 'we should be able to create a new Person with our same org !');
+		$this->assertTrue(true, 'no change, we must be OK even if invalid values exists in the object');
 
-		$oPersonObject->Set('org_id', $oMyCompanyOrg->GetKey());
+		$oPersonObject->Set('manager_id', $oPersonOfDemoOrg->GetKey());
+		$oPersonObject->CheckChangedExtKeysValues();
+		$this->assertTrue(true, 'valid extkey value : manager is in the allowed org');
+
+		$oPersonObject->CheckChangedExtKeysValues($oAlwaysTrueCallback);
+		$this->assertTrue(true, 'Always true callback should avoid error');
+
+		try {
+			$oPersonObject->CheckChangedExtKeysValues($oAlwaysFalseCallback);
+			$this->fail('Always false callback should always throw an error');
+		} catch (InvalidExternalKeyValueException $eCannotSave) {
+			$this->assertTrue(true, 'Always false callback should always throw an error');
+		}
+
+		$oPersonObject->Set('manager_id', $oPersonOfMyCompanyOrg->GetKey());
 		try {
 			$oPersonObject->CheckChangedExtKeysValues();
 			$this->fail('Creating a Person with an non allowed org should throw an exception !');
 		} catch (InvalidExternalKeyValueException $eCannotSave) {
-			$this->assertEquals('org_id', $eCannotSave->GetAttCode());
+			$this->assertEquals('manager_id', $eCannotSave->GetAttCode());
 			$this->assertEquals($oMyCompanyOrg->GetKey(), $eCannotSave->GetAttValue());
+		}
+
+		$oPersonObject->CheckChangedExtKeysValues($oAlwaysTrueCallback);
+		$this->assertTrue(true, 'Always true callback should avoid error');
+
+		try {
+			$oPersonObject->CheckChangedExtKeysValues($oAlwaysFalseCallback);
+			$this->fail('Always false callback should always throw an error');
+		} catch (InvalidExternalKeyValueException $eCannotSave) {
+			$this->assertTrue(true, 'Always false callback should always throw an error');
 		}
 
 		// ugly hack to remove caches SQL query :(
