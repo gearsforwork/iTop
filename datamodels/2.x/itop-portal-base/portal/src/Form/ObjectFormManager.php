@@ -1138,8 +1138,11 @@ class ObjectFormManager extends FormManager
 			$bWasModified = $this->oObject->IsModified();
 			$bActivateTriggers = (!$bIsNew && $bWasModified);
 
+			/** @var SecurityHelper $oSecurityHelper */
+			$oSecurityHelper = $this->oContainer->get('security_helper');
+
 			// Forcing allowed writing on the object if necessary. This is used in some particular cases.
-			$bAllowWrite = $this->oContainer->get('security_helper')->IsActionAllowed($bIsNew ? UR_ACTION_CREATE : UR_ACTION_MODIFY, $sObjectClass, $this->oObject->GetKey());
+			$bAllowWrite = $oSecurityHelper->IsActionAllowed($bIsNew ? UR_ACTION_CREATE : UR_ACTION_MODIFY, $sObjectClass, $this->oObject->GetKey());
 			if ($bAllowWrite) {
 				$this->oObject->AllowWrite(true);
 			}
@@ -1147,9 +1150,7 @@ class ObjectFormManager extends FormManager
 			// Writing object to DB
 			try
 			{
-				$this->oObject->CheckChangedExtKeysValues(function ($sClass, $sId): bool {
-					/** @var SecurityHelper $oSecurityHelper */
-					$oSecurityHelper = $this->oContainer->get('security_helper');
+				$this->oObject->CheckChangedExtKeysValues(function ($sClass, $sId) use ($oSecurityHelper): bool {
 					return $oSecurityHelper->IsActionAllowed(UR_ACTION_READ, $sClass, $sId);
 				});
 				$this->oObject->DBWrite();
