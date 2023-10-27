@@ -145,7 +145,7 @@ class DBObjectTest extends ItopDataTestCase
 		$sConfigurationManagerProfileId = 3; // Access to Person objects
 		$oUserWithAllowedOrgs = $this->CreateDemoOrgUser($oDemoOrg, $sConfigurationManagerProfileId);
 
-		$oAdminUser = MetaModel::GetObjectByName(User::class, 'admin');
+		$oAdminUser = MetaModel::GetObjectByName(User::class, 'admin', false);
 		if (is_null($oAdminUser)) {
 			$oAdminUser = $this->CreateUser('admin', 1);
 		}
