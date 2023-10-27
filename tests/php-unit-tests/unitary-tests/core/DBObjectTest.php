@@ -197,7 +197,8 @@ class DBObjectTest extends ItopDataTestCase
 		// In 3.0+ this won't be necessary anymore thanks to UserRights::Logoff
 		$this->SetNonPublicStaticProperty(MetaModel::class, 'aQueryCacheGetObject', []);
 
-		UserRights::Login('admin');
+		$bAdminLoginResult = UserRights::Login('admin');
+		$this->assertTrue($bAdminLoginResult, 'cannot log as admin user :(');
 		$oPersonObject->CheckChangedExtKeysValues();
 		$this->assertTrue(true, 'Admin user can create objects in any org');
 	}
