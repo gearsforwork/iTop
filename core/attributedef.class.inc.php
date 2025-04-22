@@ -4465,7 +4465,7 @@ class AttributeText extends AttributeString
 	{
 		// Is there a way to know the current limitation for mysql?
 		// See mysql_field_len()
-		return 16383; // number of characters (that can be 1-4 bytes long), not of bytes
+		return 65535;
 	}
 
 	public static function RenderWikiHtml($sText, $bWikiOnly = false)

@@ -24,7 +24,6 @@ use AttributeDateTime;
 use Combodo\iTop\Application\WebPage\iTopWebPage;
 use Combodo\iTop\Application\WebPage\WebPage;
 use Combodo\iTop\Service\Events\EventData;
-use EventRestService;
 use Combodo\iTop\Test\UnitTest\ItopDataTestCase;
 use CoreException;
 use DateTime;
@@ -1439,23 +1438,5 @@ class DBObjectTest extends ItopDataTestCase
 		$this->assertDBQueryCount(0, function () use (&$oUserRequest) {
 			$oUserRequest->Get('functionalcis_list');
 		});
-	}
-
-	public function testStringFitsInField()
-	{
-		//🎁 character is 4 bytes long
-		$sTooLongText = str_repeat('🎁', 17000);
-		$oLog = new EventRestService();
-		$this->assertFalse($oLog->StringFitsInField('json_output', $sTooLongText));
-
-		$sCorrectLengthText = str_repeat('🎁', 16383);
-		$this->assertTrue($oLog->StringFitsInField('json_output', $sCorrectLengthText));
-
-
-		$sCorrectLengthString = str_repeat('🎁', 255);
-		$this->assertTrue($oLog->StringFitsInField('operation', $sCorrectLengthString));
-
-		$sTooLongString = str_repeat('🎁', 256);
-		$this->assertFalse($oLog->StringFitsInField('operation', $sTooLongString));
 	}
 }

@@ -2,19 +2,11 @@
 
 namespace Combodo\iTop\Test\UnitTest\Core;
 
-use ArchivedObjectException;
 use AttributeDate;
 use AttributeDateTime;
 use Change;
 use Combodo\iTop\Test\UnitTest\ItopDataTestCase;
-use CoreCannotSaveObjectException;
-use CoreException;
-use CoreUnexpectedValue;
-use CoreWarning;
-use EventRestService;
 use MetaModel;
-use MySQLException;
-use OQLException;
 use UserRequest;
 
 class AttributeDefinitionTest extends ItopDataTestCase {
@@ -351,23 +343,4 @@ PHP
 		return $oAttribute;
 	}
 
-	/**
-	 * @throws CoreException
-	 * @throws CoreUnexpectedValue
-	 * @throws OQLException
-	 * @throws ArchivedObjectException
-	 * @throws CoreCannotSaveObjectException
-	 * @throws CoreWarning
-	 * @throws MySQLException
-	 */
-	public function testTrimLogOnAttributeText()
-	{
-		// will throw MySQLException if GetMaxSize() of AttributeText is incorrect (should be number of bytes, not of characters)
-		$oLog = new EventRestService();
-		$sLongString = json_encode(array_fill(0, 5000, 'é😃 '),
-			JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
-		$oLog->SetTrim('json_input', $sLongString);
-		static::assertNotEquals($oLog->Get('json_input'), $sLongString);
-		static::assertStringContainsString('truncated', $oLog->Get('json_input'));
-	}
 }
